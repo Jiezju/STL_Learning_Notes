@@ -92,4 +92,39 @@
             bound_memfn(ten_two);
             ```
         - cbegin ; cend 表示 const 的 iterator，不允许改变 iterator 指向的值    
-        
+
+ - 迭代器适配器
+
+	- inserter
+
+		![](./img/104.png)
+		- **Notes**
+
+			- 拷贝仅仅进行赋值，不做内存是否合法检查，inserter 迭代器则会解决这个危险，当内存不存在时，就会额外分配空间，进行赋值
+			- copy 函数用法
+
+				```C++
+                copy(start, end, dst_start);
+                # 将 start end 之间的数值 拷贝到 dst_start之后
+                
+                copy(start, end, inserter(foo, dst_start))
+                ```
+           - inserter 的实现技巧：进行了 **=** 的操作符重载，实际上调用了容器自己的 **insert** 的函数
+
+- 特殊适配器
+
+	- ostream_iterator
+	
+    ![](./img/105.png)
+    
+    	- **Notes**
+
+			- 主要通过重载 \* 与 = 运算符，实现了 copy 到 cout 的转换，其实就是 ++ 与 \* 运算符无动作，= 运算符重定义
+
+	- istream_iterator
+
+		![](./img/106.png)
+        ![](./img/107.png)
+        - **Notes**
+
+			- 通过 改写 重载的 ++ 函数实现了 cin 的操作，并且在**创建 std::in 的时候就已经读入第一个数了**(就是因为调用了 ++ )
