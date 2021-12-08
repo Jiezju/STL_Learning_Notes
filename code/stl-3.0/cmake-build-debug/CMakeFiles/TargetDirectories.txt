@@ -1,0 +1,5 @@
+/home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0/cmake-build-debug/CMakeFiles/test.dir
+/home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0/cmake-build-debug/CMakeFiles/demo_1.dir
+/home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0/cmake-build-debug/CMakeFiles/demo_2.dir
+/home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0/cmake-build-debug/CMakeFiles/edit_cache.dir

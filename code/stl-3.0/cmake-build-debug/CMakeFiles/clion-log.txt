@@ -1,0 +1,4 @@
+/home/bright/clion-2021.1.1/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_DEPENDS_USE_COMPILER=FALSE -G "CodeBlocks - Unix Makefiles" /home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/bright/CLionProjects/STL_Learning_Notes/code/stl-3.0/cmake-build-debug

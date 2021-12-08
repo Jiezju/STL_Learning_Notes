@@ -1,0 +1,1 @@
+/usr/bin/c++ -g CMakeFiles/test.dir/test/stl30_repo.cpp.o -o test 
