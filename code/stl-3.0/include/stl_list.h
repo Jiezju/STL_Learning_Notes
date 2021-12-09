@@ -145,8 +145,8 @@ public:
     typedef __list_iterator<T, const T &, const T *> const_iterator;
 
 #ifdef __STL_CLASS_PARTIAL_SPECIALIZATION
-    typedef reverse_iterator<const_iterator> const_reverse_iterator;
-    typedef reverse_iterator<iterator> reverse_iterator;
+    typedef sgi_std::reverse_iterator<const_iterator> const_reverse_iterator;
+    typedef sgi_std::reverse_iterator<iterator> reverse_iterator;
 #else /* __STL_CLASS_PARTIAL_SPECIALIZATION */
     typedef reverse_bidirectional_iterator <const_iterator, value_type,
     const_reference, difference_type>
@@ -478,7 +478,7 @@ void list<T, Alloc>::insert(iterator position, size_type n, const T &x) {
 }
 
 template<class T, class Alloc>
-list<T, Alloc>::iterator list<T, Alloc>::erase(iterator first, iterator last) {
+typename list<T, Alloc>::iterator list<T, Alloc>::erase(iterator first, iterator last) {
     while (first != last) erase(first++);
     return last;
 }
