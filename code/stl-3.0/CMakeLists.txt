@@ -1,111 +1,18 @@
 cmake_minimum_required(VERSION 3.20)
 project(stl_3_0)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 11)
 
-include_directories(include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(test
-        include/stl_algo.h
-        include/stl_algobase.h
-        include/stl_alloc.h
-        include/stl_bvector.h
-        include/stl_config.h
-        include/stl_construct.h
-        include/stl_deque.h
-        include/stl_function.h
-        include/stl_hash_fun.h
-        include/stl_hash_map.h
-        include/stl_hash_set.h
-        include/stl_hashtable.h
-        include/stl_heap.h
-        include/stl_iterator.h
-        include/stl_list.h
-        include/stl_map.h
-        include/stl_multimap.h
-        include/stl_multiset.h
-        include/stl_numeric.h
-        include/stl_pair.h
-        include/stl_queue.h
-        include/stl_raw_storage_iter.h
-        include/stl_relops.h
-        include/stl_rope.h
-        include/stl_set.h
-        include/stl_slist.h
-        include/stl_stack.h
-        include/stl_tempbuf.h
-        include/stl_tree.h
-        include/stl_uninitialized.h
-        include/stl_vector.h
-        include/type_traits.h
-        test/stl30_repo.cpp)
+file(GLOB_RECURSE srcs ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
 
-add_executable(demo_1
-        include/stl_algo.h
-        include/stl_algobase.h
-        include/stl_alloc.h
-        include/stl_bvector.h
-        include/stl_config.h
-        include/stl_construct.h
-        include/stl_deque.h
-        include/stl_function.h
-        include/stl_hash_fun.h
-        include/stl_hash_map.h
-        include/stl_hash_set.h
-        include/stl_hashtable.h
-        include/stl_heap.h
-        include/stl_iterator.h
-        include/stl_list.h
-        include/stl_map.h
-        include/stl_multimap.h
-        include/stl_multiset.h
-        include/stl_numeric.h
-        include/stl_pair.h
-        include/stl_queue.h
-        include/stl_raw_storage_iter.h
-        include/stl_relops.h
-        include/stl_rope.h
-        include/stl_set.h
-        include/stl_slist.h
-        include/stl_stack.h
-        include/stl_tempbuf.h
-        include/stl_tree.h
-        include/stl_uninitialized.h
-        include/stl_vector.h
-        include/type_traits.h
-        test/demo_1.cpp)
+# 打印变量
+#message(${srcs})
 
-add_executable(demo_2
-        include/stl_algo.h
-        include/stl_algobase.h
-        include/stl_alloc.h
-        include/stl_bvector.h
-        include/stl_config.h
-        include/stl_construct.h
-        include/stl_deque.h
-        include/stl_function.h
-        include/stl_hash_fun.h
-        include/stl_hash_map.h
-        include/stl_hash_set.h
-        include/stl_hashtable.h
-        include/stl_heap.h
-        include/stl_iterator.h
-        include/stl_list.h
-        include/stl_map.h
-        include/stl_multimap.h
-        include/stl_multiset.h
-        include/stl_numeric.h
-        include/stl_pair.h
-        include/stl_queue.h
-        include/stl_raw_storage_iter.h
-        include/stl_relops.h
-        include/stl_rope.h
-        include/stl_set.h
-        include/stl_slist.h
-        include/stl_stack.h
-        include/stl_tempbuf.h
-        include/stl_tree.h
-        include/stl_uninitialized.h
-        include/stl_vector.h
-        include/type_traits.h
-        test/iter_visit.cpp)
+foreach(source ${srcs})
+#    message(${source})
+    get_filename_component(name ${source} NAME_WE)
+    # target
+    add_executable(${name} ${source})
+endforeach(source)

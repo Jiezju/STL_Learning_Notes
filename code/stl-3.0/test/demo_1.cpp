@@ -3,7 +3,6 @@
 /* Demo Description:  Six Components */
 
 #include "../include/vector"
-#include "../include/stl_alloc.h"
 #include "../include/algorithm"
 #include "../include/functional"
 #include <iostream>
