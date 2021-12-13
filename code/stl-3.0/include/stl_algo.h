@@ -1044,6 +1044,7 @@ void __introsort_loop(RandomAccessIterator first,
   }
 }
 
+// 全局 sort 适用于 RandomAccessIterator 即 随机访问选择器
 template <class RandomAccessIterator>
 inline void sort(RandomAccessIterator first, RandomAccessIterator last) {
   if (first != last) {

@@ -403,6 +403,7 @@ public:
 
     void reverse();
 
+    // 数据 list 与操作 sort 进行绑定，list 有自己独特的 sort 方法
     void sort();
 
 #ifdef __STL_MEMBER_TEMPLATES

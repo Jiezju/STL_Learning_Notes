@@ -5,10 +5,13 @@
 - OOP企图将**data**和**method**绑定
 
 	如数据 **list** 与操作 **sort** 进行绑定 
-	![](./img/13.png)
+	
+    ![](./img/13.png)
     
     - **STL**库无法将 **list** 和 **sort** 分离的主要原因：
-    	![](./img/15.png)
+    	
+        ![](./img/15.png)
+        
         全局sort函数依赖于支持随机索引的容器，而list不支持这类操作，所以只能和list类进行绑定
 
 - GP将**data**和**method**分离

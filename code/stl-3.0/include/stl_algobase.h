@@ -90,6 +90,7 @@ inline const T& min(const T& a, const T& b) {
   return b < a ? b : a;
 }
 
+// 使用 max 函数，需要 重载运算符 <
 template <class T>
 inline const T& max(const T& a, const T& b) {
   return  a < b ? b : a;
@@ -102,6 +103,7 @@ inline const T& min(const T& a, const T& b, Compare comp) {
   return comp(b, a) ? b : a;
 }
 
+// Compare 对应 比较函数指针
 template <class T, class Compare>
 inline const T& max(const T& a, const T& b, Compare comp) {
   return comp(a, b) ? b : a;

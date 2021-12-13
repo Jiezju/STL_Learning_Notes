@@ -103,6 +103,7 @@ struct iterator_traits {
   typedef typename Iterator::reference         reference;
 };
 
+// 范围 偏特化 特化为指针类型
 template <class T>
 struct iterator_traits<T*> {
   typedef random_access_iterator_tag iterator_category;
