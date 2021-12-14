@@ -132,9 +132,11 @@ __STL_BEGIN_NAMESPACE
 # endif
 #endif
 
+// 一级配置器
 template <int inst>
 class __malloc_alloc_template {
 
+// 这里private里面的函数都是在内存不足的时候进行调用的
 private:
 
 static void *oom_malloc(size_t);
@@ -142,6 +144,7 @@ static void *oom_malloc(size_t);
 static void *oom_realloc(void *, size_t);
 
 #ifndef __STL_STATIC_TEMPLATE_MEMBER_BUG
+    // 内存不足设置的处理例程, 默认设置的是0, 表示没有设置处理例程, 这个处理例程是由用户手动设置的
     static void (* __malloc_alloc_oom_handler)();
 #endif
 
@@ -149,7 +152,9 @@ public:
 
 static void * allocate(size_t n)
 {
+    // 这里直接调用malloc分配内存
     void *result = malloc(n);
+    // 分配失败 继续调用oom_malloc来选择抛出异常还是一直申请内存, 直到申请内存成功.
     if (0 == result) result = oom_malloc(n);
     return result;
 }
@@ -188,6 +193,7 @@ void * __malloc_alloc_template<inst>::oom_malloc(size_t n)
     void (* my_malloc_handler)();
     void *result;
 
+    // 用户自定义处理例程, 就一直申请内存, 否则抛出异常
     for (;;) {
         my_malloc_handler = __malloc_alloc_oom_handler;
         if (0 == my_malloc_handler) { __THROW_BAD_ALLOC; }
