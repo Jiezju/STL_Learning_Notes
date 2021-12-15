@@ -33,19 +33,27 @@
 
 //#include <new.h>
 #include <new>
+#include "stl_config.h"
+#include "type_traits.h"
+#include "stl_iterator.h"
 
 __STL_BEGIN_NAMESPACE
 
+// destroy 函数
 template <class T>
 inline void destroy(T* pointer) {
-    pointer->~T();
+    pointer->~T(); // 调用 T 的 析构函数
 }
 
+// placement new: 在 指针 p 所指向的内存空间创建一个 T1 类型的对象，对象的内容是从 T2 类型的对象转换而来
+// 类似 realloc
 template <class T1, class T2>
 inline void construct(T1* p, const T2& value) {
   new (p) T1(value);
 }
 
+// 当__type_traits为__false_type时, 调用的是下面这个函数, 通过迭代所有的对象并调用版本一的函数执行析构函数进行析构.
+// 而这个是被称为non-travial destructor，就会调用自己的析构函数进行释放
 template <class ForwardIterator>
 inline void
 __destroy_aux(ForwardIterator first, ForwardIterator last, __false_type) {
@@ -53,20 +61,26 @@ __destroy_aux(ForwardIterator first, ForwardIterator last, __false_type) {
     destroy(&*first);
 }
 
+// 当__type_traits为__true_type时,表明由系统回收内存，所以什么都不会做
 template <class ForwardIterator> 
-inline void __destroy_aux(ForwardIterator, ForwardIterator, __true_type) {}
+inline void
+__destroy_aux(ForwardIterator, ForwardIterator, __true_type) {}
 
 template <class ForwardIterator, class T>
 inline void __destroy(ForwardIterator first, ForwardIterator last, T*) {
+  // 用于获取迭代器所指对象的类型 并定义为 trivial_destructor [用户未定义析构函数]
   typedef typename __type_traits<T>::has_trivial_destructor trivial_destructor;
+  // 通过类型的不一样选择执行不同的析构调用
   __destroy_aux(first, last, trivial_destructor());
 }
 
+// 传入两个迭代器 的 destroy 函数
 template <class ForwardIterator>
 inline void destroy(ForwardIterator first, ForwardIterator last) {
   __destroy(first, last, value_type(first));
 }
 
+// destroy(ForwardIterator first, ForwardIterator last) 函数的特化版本
 inline void destroy(char*, char*) {}
 inline void destroy(wchar_t*, wchar_t*) {}
 
