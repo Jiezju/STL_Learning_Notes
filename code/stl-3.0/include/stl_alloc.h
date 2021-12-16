@@ -218,8 +218,20 @@ void * __malloc_alloc_template<inst>::oom_realloc(void *p, size_t n)
     }
 }
 
+// 程序默认定义mallo_alloc函数, 并且设置统一的调用接口, 默认的的接口为第二级配置器
+// 默认将malloc_alloc设为0;
 typedef __malloc_alloc_template<0> malloc_alloc;
 
+/*
+ * 定义符合STL规格的配置器接口, 不管是一级配置器还是二级配置器都是使用这个接口进行分配的
+ * 容器指定的 alloc 分配器 通过 调用 simple_alloc<T, alloc> 实现分配
+ * 通过 Alloc::allocate 分配内存
+ * Alloc::deallocate 释放内存
+ *
+ * container<T, Alloc> -> container() -> simple_alloc<T, Alloc> -> Alloc::allocate
+ * ~container<T, Alloc> -> ~container() -> simple_alloc<T, Alloc> -> Alloc::deallocate
+ *
+ * */
 template<class T, class Alloc>
 class simple_alloc {
 
