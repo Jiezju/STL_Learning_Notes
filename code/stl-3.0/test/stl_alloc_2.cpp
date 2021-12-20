@@ -14,6 +14,9 @@ int main() {
     // SGI STL 的配置器，其名称是 alloc 而不是 allocator，而且不接受任何参数
     vector<int, malloc_alloc> vi(ia, ia+6);
 
+    // 使用 第二级分配器进行内存分配
+    vector<int, alloc> va(ia, ia+6);
+
     return 0;
 }
 

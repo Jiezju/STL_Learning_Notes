@@ -329,6 +329,9 @@ typedef malloc_alloc single_client_alloc;
   enum {__NFREELISTS = __MAX_BYTES/__ALIGN};
 #endif
 
+/*
+ * 第二级配置器：默认的内存分配器
+ * */
 template <bool threads, int inst>
 class __default_alloc_template {
 
@@ -336,9 +339,9 @@ private:
   // Really we should use static const int x = N
   // instead of enum { x = N }, but few compilers accept the former.
 # ifndef __SUNPRO_CC
-    enum {__ALIGN = 8};
-    enum {__MAX_BYTES = 128};
-    enum {__NFREELISTS = __MAX_BYTES/__ALIGN};
+    enum {__ALIGN = 8}; // 设置对齐要求. 对齐为8字节, 没有8字节自动补齐
+    enum {__MAX_BYTES = 128}; // 第二级配置器的最大一次性申请大小, 大于128就直接调用第一级配置器
+    enum {__NFREELISTS = __MAX_BYTES/__ALIGN}; // 128字节能分配的的链表个数, 分别代表8, 16, 32....字节的链表
 # endif
   static size_t ROUND_UP(size_t bytes) {
         return (((bytes) + __ALIGN-1) & ~(__ALIGN - 1));
@@ -355,6 +358,7 @@ private:
 # else
     static obj * __VOLATILE free_list[__NFREELISTS]; 
 # endif
+  // 进行对齐操作, 将不满8的倍数的填充成8的倍数
   static  size_t FREELIST_INDEX(size_t bytes) {
         return (((bytes) + __ALIGN-1)/__ALIGN - 1);
   }
@@ -411,9 +415,11 @@ public:
     obj * __VOLATILE * my_free_list;
     obj * __RESTRICT result;
 
+    // 先判断申请的字节大小是不是大于128字节, 是, 则交给第一级配置器来处理. 否, 继续往下执行
     if (n > (size_t) __MAX_BYTES) {
         return(malloc_alloc::allocate(n));
     }
+    // 找到分配的地址对齐后分配的是第几个大小的链表
     my_free_list = free_list + FREELIST_INDEX(n);
     // Acquire the lock here with a constructor call.
     // This ensures that it is released in exit or during stack
@@ -422,11 +428,13 @@ public:
         /*REFERENCED*/
         lock lock_instance;
 #       endif
+    //  获得该链表指向的首地址, 如果链表没有多余的内存, 就先填充链表
     result = *my_free_list;
     if (result == 0) {
-        void *r = refill(ROUND_UP(n));
+        void *r = refill(ROUND_UP(n)); // refill内存填充
         return r;
     }
+    // 返回链表的首地址, 和一块能容纳一个对象的内存, 并更新链表的首地址
     *my_free_list = result -> free_list_link;
     return (result);
   };
@@ -437,6 +445,7 @@ public:
     obj *q = (obj *)p;
     obj * __VOLATILE * my_free_list;
 
+    // 释放的内存大于128字节直接调用一级配置器进行释放
     if (n > (size_t) __MAX_BYTES) {
         malloc_alloc::deallocate(p, n);
         return;
@@ -532,18 +541,23 @@ template <bool threads, int inst>
 void* __default_alloc_template<threads, inst>::refill(size_t n)
 {
     int nobjs = 20;
+    // 向内存池申请空间的起始地址
     char * chunk = chunk_alloc(n, nobjs);
     obj * __VOLATILE * my_free_list;
     obj * result;
     obj * current_obj, * next_obj;
     int i;
 
+    // 如果只申请到一个对象的大小, 就直接返回一个内存的大小
     if (1 == nobjs) return(chunk);
+    // 申请的大小不只一个对象的大小的时候
     my_free_list = free_list + FREELIST_INDEX(n);
 
     /* Build free list in chunk */
       result = (obj *)chunk;
+    // my_free_list指向内存池返回的地址的下一个对齐后的地址
       *my_free_list = next_obj = (obj *)(chunk + n);
+    // 这里从第二个开始的原因主要是第一块地址返回给了用户, 现在需要把从内存池里面分配的内存用链表给串起来
       for (i = 1; ; i++) {
         current_obj = next_obj;
         next_obj = (obj *)((char *)next_obj + n);
