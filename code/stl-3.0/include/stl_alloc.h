@@ -15,6 +15,10 @@
  *   You should not attempt to use it directly.
  */
 
+/*
+ * 负责内存空间的配置和释放
+ * */
+
 #ifndef __SGI_STL_INTERNAL_ALLOC_H
 #define __SGI_STL_INTERNAL_ALLOC_H
 

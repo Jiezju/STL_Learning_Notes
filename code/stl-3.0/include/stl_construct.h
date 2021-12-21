@@ -28,25 +28,29 @@
  *   You should not attempt to use it directly.
  */
 
+/*
+ * 负责对象内容的构造与析构
+ * */
+
 #ifndef __SGI_STL_INTERNAL_CONSTRUCT_H
 #define __SGI_STL_INTERNAL_CONSTRUCT_H
 
 //#include <new.h>
-#include <new>
+#include <new> // 使用 placement new 的包含头文件
 #include "stl_config.h"
 #include "type_traits.h"
 #include "stl_iterator.h"
 
 __STL_BEGIN_NAMESPACE
 
-// destroy 函数
+// 第一版本 destroy 函数，接受参数为 指针
 template <class T>
 inline void destroy(T* pointer) {
     pointer->~T(); // 调用 T 的 析构函数
 }
 
 // placement new: 在 指针 p 所指向的内存空间创建一个 T1 类型的对象，对象的内容是从 T2 类型的对象转换而来
-// 类似 realloc
+// 类似 realloc 将初值设定到指定的空间上
 template <class T1, class T2>
 inline void construct(T1* p, const T2& value) {
   new (p) T1(value);
@@ -74,7 +78,7 @@ inline void __destroy(ForwardIterator first, ForwardIterator last, T*) {
   __destroy_aux(first, last, trivial_destructor());
 }
 
-// 传入两个迭代器 的 destroy 函数
+// 第二版本的 destroy 函数 传入两个迭代器 的 destroy 函数
 template <class ForwardIterator>
 inline void destroy(ForwardIterator first, ForwardIterator last) {
   __destroy(first, last, value_type(first));
