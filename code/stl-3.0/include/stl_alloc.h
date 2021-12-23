@@ -143,7 +143,8 @@ class __malloc_alloc_template {
 // 这里private里面的函数都是在内存不足的时候进行调用的
 private:
 
-static void *oom_malloc(size_t);
+// 三个私有函数 处理 内存不足的 情况
+static void *oom_malloc(size_t); // oom: out of memory
 
 static void *oom_realloc(void *, size_t);
 
@@ -165,6 +166,7 @@ static void * allocate(size_t n)
 
 static void deallocate(void *p, size_t /* n */)
 {
+    // 直接调用 free
     free(p);
 }
 
@@ -187,6 +189,7 @@ static void (* set_malloc_handler(void (*f)()))()
 // malloc_alloc out-of-memory handling
 
 #ifndef __STL_STATIC_TEMPLATE_MEMBER_BUG
+// 由 用户指定的 内存不足 处理函数
 template <int inst>
 void (* __malloc_alloc_template<inst>::__malloc_alloc_oom_handler)() = 0;
 #endif
@@ -223,7 +226,7 @@ void * __malloc_alloc_template<inst>::oom_realloc(void *p, size_t n)
 }
 
 // 程序默认定义mallo_alloc函数, 并且设置统一的调用接口, 默认的的接口为第二级配置器
-// 默认将malloc_alloc设为0;
+// 默认将 inst 设为0;
 typedef __malloc_alloc_template<0> malloc_alloc;
 
 /*
@@ -347,22 +350,32 @@ private:
     enum {__MAX_BYTES = 128}; // 第二级配置器的最大一次性申请大小, 大于128就直接调用第一级配置器
     enum {__NFREELISTS = __MAX_BYTES/__ALIGN}; // 128字节能分配的的链表个数, 分别代表8, 16, 32....字节的链表
 # endif
+  // 将 bytes 上调到 8 的倍数，内存分配都是以 一定字节数的倍数进行分配的，而不是任意字节分配
+  /*************************************************************/
   static size_t ROUND_UP(size_t bytes) {
         return (((bytes) + __ALIGN-1) & ~(__ALIGN - 1));
   }
 __PRIVATE:
-  union obj {
-        union obj * free_list_link;
-        char client_data[1];    /* The client sees this.        */
+  // free-list 节点 构建， 采用 union 使 free_list_link 与 client_data 共享内存
+  /*
+  union old_obj {
+        union old_obj * free_list_link;
+        char client_data[1];    // The client sees this. 此部分代码无效 可以删掉
+  };
+  */
+
+  // 使用 struct 替代
+  struct obj {
+      struct obj * free_list_link;
   };
 private:
 # ifdef __SUNPRO_CC
     static obj * __VOLATILE free_list[]; 
         // Specifying a size results in duplicate def for 4.1
 # else
-    static obj * __VOLATILE free_list[__NFREELISTS]; 
+    static obj * __VOLATILE free_list[__NFREELISTS]; // 16 个 free list 节点 声明
 # endif
-  // 进行对齐操作, 将不满8的倍数的填充成8的倍数
+  // 根据 数据快 bytes 大小，决定使用 第 n 号 链表
   static  size_t FREELIST_INDEX(size_t bytes) {
         return (((bytes) + __ALIGN-1)/__ALIGN - 1);
   }
@@ -374,8 +387,8 @@ private:
   static char *chunk_alloc(size_t size, int &nobjs);
 
   // Chunk allocation state.
-  static char *start_free;
-  static char *end_free;
+  static char *start_free; // 内存池起始位置
+  static char *end_free; // 内存池终止位置
   static size_t heap_size;
 
 # ifdef __STL_SGI_THREADS
@@ -432,7 +445,7 @@ public:
         /*REFERENCED*/
         lock lock_instance;
 #       endif
-    //  获得该链表指向的首地址, 如果链表没有多余的内存, 就先填充链表
+    // 获得该链表指向的首地址, 如果链表没有多余的内存, 就重新填充链表
     result = *my_free_list;
     if (result == 0) {
         void *r = refill(ROUND_UP(n)); // refill内存填充
