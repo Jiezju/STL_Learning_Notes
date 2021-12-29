@@ -338,6 +338,8 @@ typedef malloc_alloc single_client_alloc;
 
 /*
  * 第二级配置器：默认的内存分配器
+ *
+ * 特点：完全使用 静态 成员变量和静态成员函数，方便使用C语言重写
  * */
 template <bool threads, int inst>
 class __default_alloc_template {
@@ -346,11 +348,14 @@ private:
   // Really we should use static const int x = N
   // instead of enum { x = N }, but few compilers accept the former.
 # ifndef __SUNPRO_CC
+    // 常量定义 建议 定义为 constant
     enum {__ALIGN = 8}; // 设置对齐要求. 对齐为8字节, 没有8字节自动补齐
     enum {__MAX_BYTES = 128}; // 第二级配置器的最大一次性申请大小, 大于128就直接调用第一级配置器
     enum {__NFREELISTS = __MAX_BYTES/__ALIGN}; // 128字节能分配的的链表个数, 分别代表8, 16, 32....字节的链表
+    static const int NOBJS = 20; // 更友好的编码方式
 # endif
   // 将 bytes 上调到 8 的倍数，内存分配都是以 一定字节数的倍数进行分配的，而不是任意字节分配
+  // 例如 byte 为 13， 则 （13 + 7）&~ 7 = 16 同时计算后续的追加量
   /*************************************************************/
   static size_t ROUND_UP(size_t bytes) {
         return (((bytes) + __ALIGN-1) & ~(__ALIGN - 1));
@@ -365,31 +370,42 @@ __PRIVATE:
   */
 
   // 使用 struct 替代
+  // embeded pointer 实际上一个单向链表，free_list_link 实际上就是 next 指针
+  /*
+   obj(node)
+   | |-> free_list_link
+
+   * */
   struct obj {
       struct obj * free_list_link;
   };
+
 private:
 # ifdef __SUNPRO_CC
     static obj * __VOLATILE free_list[]; 
         // Specifying a size results in duplicate def for 4.1
 # else
-    static obj * __VOLATILE free_list[__NFREELISTS]; // 16 个 free list 节点 声明
+    // 16 个 free list 节点 声明 的数组，每个元素存储各自链表的头指针 obj*
+    static obj * __VOLATILE free_list[__NFREELISTS];
 # endif
-  // 根据 数据快 bytes 大小，决定使用 第 n 号 链表
+  // 根据 数据快 bytes 大小，决定使用 第 n 号 链表， 比如 8 则对应 2 号链表
   static  size_t FREELIST_INDEX(size_t bytes) {
         return (((bytes) + __ALIGN-1)/__ALIGN - 1);
   }
 
   // Returns an object of size n, and optionally adds to size n free list.
+  // 链表为空时，就需要填充内存
   static void *refill(size_t n);
   // Allocates a chunk for nobjs of size size.  nobjs may be reduced
   // if it is inconvenient to allocate the requested number.
+  // 分配一大块内存
   static char *chunk_alloc(size_t size, int &nobjs);
 
   // Chunk allocation state.
+  // pool 使用 char 声明 是因为 char 是一个字节，方便后续字节计算
   static char *start_free; // 内存池起始位置
   static char *end_free; // 内存池终止位置
-  static size_t heap_size;
+  static size_t heap_size; // 分配累计总量，方便计算累计分配量
 
 # ifdef __STL_SGI_THREADS
     static volatile unsigned long __node_allocator_lock;
@@ -429,7 +445,8 @@ public:
   /* n must be > 0      */
   static void * allocate(size_t n)
   {
-    obj * __VOLATILE * my_free_list;
+    //  __VOLATILE 多线程关键字
+    obj * __VOLATILE * my_free_list; // obj** 一个指针的指针，指向元素为 obj* （指针）的数组
     obj * __RESTRICT result;
 
     // 先判断申请的字节大小是不是大于128字节, 是, 则交给第一级配置器来处理. 否, 继续往下执行
@@ -437,6 +454,7 @@ public:
         return(malloc_alloc::allocate(n));
     }
     // 找到分配的地址对齐后分配的是第几个大小的链表
+    // 头指针 free_list 向后移动 FREELIST_INDEX(n) 达到对应 的链表
     my_free_list = free_list + FREELIST_INDEX(n);
     // Acquire the lock here with a constructor call.
     // This ensures that it is released in exit or during stack
@@ -446,17 +464,26 @@ public:
         lock lock_instance;
 #       endif
     // 获得该链表指向的首地址, 如果链表没有多余的内存, 就重新填充链表
+    // 注意这个 首地址是可分配内存的首地址，当前内存块分配出去以后，当前指针更新为下一个可分配区块
     result = *my_free_list;
     if (result == 0) {
         void *r = refill(ROUND_UP(n)); // refill内存填充
         return r;
     }
-    // 返回链表的首地址, 和一块能容纳一个对象的内存, 并更新链表的首地址
+    // 如果 该链表不为空，则分配 *my_free_list指向 的区块，并将  *my_free_list 指向下一个待分配的区块
     *my_free_list = result -> free_list_link;
     return (result);
   };
 
   /* p may not be 0 */
+
+  /*****************************************/
+  /*
+   * 这个函数有两个注意点：
+   * 1. 这里只将 内存 回收到 链表中，但是没有释放到操作系统（这不是内存泄露，因为后续还是可以继续分配的）
+   * 2. 没有对 p 进行合法性检查，如果 p 不是 8 字节对齐（没有调用 alloc 进行分配），就很危险
+   * 这里有一个潜在问题，没有对 p 进行合法性检查
+   * */
   static void deallocate(void *p, size_t n)
   {
     obj *q = (obj *)p;
@@ -467,12 +494,15 @@ public:
         malloc_alloc::deallocate(p, n);
         return;
     }
+    // 仍然还是根据字节数要找到对应的链表进行回收
     my_free_list = free_list + FREELIST_INDEX(n);
     // acquire lock
 #       ifndef _NOTHREADS
         /*REFERENCED*/
         lock lock_instance;
 #       endif /* _NOTHREADS */
+
+    /* q 的 next 指针指向 即将分配的区块指针 *my_free_list，同时将 q 作为链表头存入 链表数组 */
     q -> free_list_link = *my_free_list;
     *my_free_list = q;
     // lock is released here
@@ -491,36 +521,74 @@ typedef __default_alloc_template<false, 0> single_client_alloc;
 /* the malloc heap too much.                                            */
 /* We assume that size is properly aligned.                             */
 /* We hold the allocation lock.                                         */
+
+/*
+ * chunk_alloc 的算法思路：
+ *  1. 先检查 pool是否有足够余量，有的话指直接划分，否则，有碎片进行特殊处理，然后分配一大块内存
+ * */
 template <bool threads, int inst>
 char*
+// int& nobjs pass by reference 的原因是 分配不足 20个 区块时，就需要修改 nobjs
 __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
 {
     char * result;
-    size_t total_bytes = size * nobjs;
-    size_t bytes_left = end_free - start_free;
+    size_t total_bytes = size * nobjs; // 需要的字节数
 
+    /**********************************************/
+    /*
+     *           |     20    |
+     *           |   blocks  |
+     *           =============
+     *           |           |-----------> start_free
+     *           |   pool    |
+     *           |___________|-----------> end_free
+     *
+     * */
+
+    size_t bytes_left = end_free - start_free; // 查看之前的 pool 中还有多少个字节备用
+
+    // pool 中的 size 余量 满足所需 20 个区块大小
     if (bytes_left >= total_bytes) {
         result = start_free;
-        start_free += total_bytes;
+        start_free += total_bytes; // start 下移
         return(result);
     } else if (bytes_left >= size) {
-        nobjs = bytes_left/size;
-        total_bytes = size * nobjs;
+        // 是否满足 1 个区块大小
+        nobjs = bytes_left/size; // 计算能切几个 区块
+        total_bytes = size * nobjs; // 基于更新的区块数计算所需总的字节数
+        // start 下移
         result = start_free;
         start_free += total_bytes;
         return(result);
     } else {
+        /* 不足一个，就需要碎片处理以及大块内存分配 */
+
+        // 计算 需要大块内存的分配量
+        /*
+         * 分配 2 * 20 个块 + 一个 heap_size（累计分配内存总量的） 追加量
+         * 除了 20 个块 作为区块 分配对应链表，其他都作为 pool 内存
+         * */
         size_t bytes_to_get = 2 * total_bytes + ROUND_UP(heap_size >> 4);
         // Try to make use of the left-over piece.
+        // 内存碎片处理，将碎片划分到指定 号链表
         if (bytes_left > 0) {
+            // 剩余碎片一定还是 8 对齐，找到对应链表号，直接加入他的区块
             obj * __VOLATILE * my_free_list =
                         free_list + FREELIST_INDEX(bytes_left);
 
+            // cur->next = head ; head = cur;
             ((obj *)start_free) -> free_list_link = *my_free_list;
             *my_free_list = (obj *)start_free;
         }
+        // 使用 malloc 进行内存分配
         start_free = (char *)malloc(bytes_to_get);
+
+        // 人为限制 分配量不准超过 10000 用于模拟分配失败
+//        if (bytes_to_get > 10000)
+//            start_free = 0;
+
         if (0 == start_free) {
+            // 分配失败，会向右边更大区块的链表进行内存分配
             int i;
             obj * __VOLATILE * my_free_list, *p;
             // Try to make do with what we have.  That can't
@@ -530,6 +598,7 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
                 my_free_list = free_list + FREELIST_INDEX(i);
                 p = *my_free_list;
                 if (0 != p) {
+                    // 如果右边能获得区块，就将需要的大小区块直接划进 pool
                     *my_free_list = p -> free_list_link;
                     start_free = (char *)p;
                     end_free = start_free + i;
@@ -544,8 +613,12 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
             // exception or remedy the situation.  Thus we assume it
             // succeeded.
         }
-        heap_size += bytes_to_get;
+
+        // 分配成功
+        heap_size += bytes_to_get; // 更新分配量
         end_free = start_free + bytes_to_get;
+
+        // 递归检查，主要是可能因为 系统内存问题，仍然不够 20 个，就递归下去，进行分块
         return(chunk_alloc(size, nobjs));
     }
 }
@@ -557,34 +630,40 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
 template <bool threads, int inst>
 void* __default_alloc_template<threads, inst>::refill(size_t n)
 {
-    int nobjs = 20;
+    // 默认 分配 20 个区块作为链表的带分配内存，各个块之间通过 指针 链接
+    // 但是 未必能够 分配够 20 个，这里建议 设置为 const 声明！
+    int nobjs = NOBJS;
     // 向内存池申请空间的起始地址
-    char * chunk = chunk_alloc(n, nobjs);
+    char * chunk = chunk_alloc(n, nobjs); // pass by reference
     obj * __VOLATILE * my_free_list;
     obj * result;
     obj * current_obj, * next_obj;
     int i;
 
-    // 如果只申请到一个对象的大小, 就直接返回一个内存的大小
+    // 如果只申请到一个对象的大小, 就直接返回一个内存的大小，不需要切割
     if (1 == nobjs) return(chunk);
-    // 申请的大小不只一个对象的大小的时候
+
+    // 申请的内存不止一个区块时，就要进行切割，块于块之间通过链表链接
     my_free_list = free_list + FREELIST_INDEX(n);
 
-    /* Build free list in chunk */
-      result = (obj *)chunk;
-    // my_free_list指向内存池返回的地址的下一个对齐后的地址
+    // 第一个区块不要划分，是要给出去的，所以直接划分后面的大块，首个 指针作为 结果输出
+    result = (obj *)chunk;
+
+    /* Build free list in chunk 在 chunk 里面建立自由链表*/
+    // my_free_list指向内存池返回的地址的下一个对齐后的地址 由于 指针是 char* 所以直接 +n 就是一个第二个区块的地址
       *my_free_list = next_obj = (obj *)(chunk + n);
-    // 这里从第二个开始的原因主要是第一块地址返回给了用户, 现在需要把从内存池里面分配的内存用链表给串起来
+    // 这里从第二个开始的原因主要是第一块地址返回给了用户, 现在需要把从内存池里面分配的区块用链表给串起来
       for (i = 1; ; i++) {
-        current_obj = next_obj;
-        next_obj = (obj *)((char *)next_obj + n);
+        current_obj = next_obj; // cur
+        next_obj = (obj *)((char *)next_obj + n); // 指针移动 n 个字节 获取 next
         if (nobjs - 1 == i) {
             current_obj -> free_list_link = 0;
             break;
         } else {
-            current_obj -> free_list_link = next_obj;
+            current_obj -> free_list_link = next_obj; // cur->next = next
         }
       }
+
     return(result);
 }
 
