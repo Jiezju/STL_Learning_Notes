@@ -177,6 +177,13 @@ static void * reallocate(void *p, size_t /* old_sz */, size_t new_sz)
     return result;
 }
 
+/************************************************/
+/*
+ * 等价代码
+ * typedef void (*H)(); // 定义函数指针
+ * static H set_malloc_handler(H f)
+ *
+ * */
 static void (* set_malloc_handler(void (*f)()))()
 {
     void (* old)() = __malloc_alloc_oom_handler;
@@ -466,7 +473,7 @@ public:
     // 获得该链表指向的首地址, 如果链表没有多余的内存, 就重新填充链表
     // 注意这个 首地址是可分配内存的首地址，当前内存块分配出去以后，当前指针更新为下一个可分配区块
     result = *my_free_list;
-    if (result == 0) {
+    if (0 == result) {
         void *r = refill(ROUND_UP(n)); // refill内存填充
         return r;
     }
@@ -524,7 +531,14 @@ typedef __default_alloc_template<false, 0> single_client_alloc;
 
 /*
  * chunk_alloc 的算法思路：
- *  1. 先检查 pool是否有足够余量，有的话指直接划分，否则，有碎片进行特殊处理，然后分配一大块内存
+ *   先检查 pool是否有足够余量，有的话指直接划分，否则，有碎片进行特殊处理，然后分配一大块内存
+ *  具体算法逻辑：
+ *  1. 内存池的大小大于需要的空间, 直接返回起始地址(nobjs默认设置为20, 所以每次调用都会给链表额外的19个内存块)
+ *  2. 内存池的内存不足以马上分配那么多内存, 但是还能满足分配一个即以上的大小, 那就分配出去，知道余量不足一个区块
+ *  3. 如果一个对象的大小都已经提供不了了, 先将零碎的内存块给一个小内存的链表来保存, 然后就准备调用malloc申请40块+额外大小的内存块(额外内存块就由heap_size决定), 如果申请失败跳转到步骤4, 成功跳转到步骤6
+ *  4. 通过递归来调用他们的内存块，进行内存区块分配检查
+ *  5. 如果还是没有内存块, 直接调用一级配置器来申请内存, 还是失败就抛出异常, 成功申请就继续执行
+ *  6. 重新修改内存起始地址和结束地址为当前申请的地址块, 重新调用chunk_alloc分配内存
  * */
 template <bool threads, int inst>
 char*
@@ -562,13 +576,6 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
         return(result);
     } else {
         /* 不足一个，就需要碎片处理以及大块内存分配 */
-
-        // 计算 需要大块内存的分配量
-        /*
-         * 分配 2 * 20 个块 + 一个 heap_size（累计分配内存总量的） 追加量
-         * 除了 20 个块 作为区块 分配对应链表，其他都作为 pool 内存
-         * */
-        size_t bytes_to_get = 2 * total_bytes + ROUND_UP(heap_size >> 4);
         // Try to make use of the left-over piece.
         // 内存碎片处理，将碎片划分到指定 号链表
         if (bytes_left > 0) {
@@ -580,6 +587,15 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
             ((obj *)start_free) -> free_list_link = *my_free_list;
             *my_free_list = (obj *)start_free;
         }
+
+        // 计算 需要大块内存的分配量
+        /*
+        * 分配 2 * 20 个块 + 一个 heap_size（累计分配内存总量的） 追加量
+        * 除了 20 个块 作为区块 分配对应链表，其他都作为 pool 内存
+         *  这里进行了调整 保证 bytes_to_get 被定义初始化就被立即使用
+         *  防止中间变量出现遗漏的问题
+        * */
+        size_t bytes_to_get = 2 * total_bytes + ROUND_UP(heap_size >> 4);
         // 使用 malloc 进行内存分配
         start_free = (char *)malloc(bytes_to_get);
 
@@ -590,13 +606,19 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
         if (0 == start_free) {
             // 分配失败，会向右边更大区块的链表进行内存分配
             int i;
-            obj * __VOLATILE * my_free_list, *p;
+
+            // 注意这里的类型定义等价
+            // obj * __VOLATILE * my_free_list, *p;
+            obj* __VOLATILE * my_free_list;
+            obj* p;
+
             // Try to make do with what we have.  That can't
             // hurt.  We do not try smaller requests, since that tends
             // to result in disaster on multi-process machines.
             for (i = size; i <= __MAX_BYTES; i += __ALIGN) {
                 my_free_list = free_list + FREELIST_INDEX(i);
                 p = *my_free_list;
+                /* 这种写法的好处 防止 p = 0 的bug，编译器无法查看 */
                 if (0 != p) {
                     // 如果右边能获得区块，就将需要的大小区块直接划进 pool
                     *my_free_list = p -> free_list_link;
@@ -607,7 +629,8 @@ __default_alloc_template<threads, inst>::chunk_alloc(size_t size, int& nobjs)
                     // right free list.
                 }
             }
-	    end_free = 0;	// In case of exception.
+	        end_free = 0;	// In case of exception.
+            // 如果一点内存都没有了的话, 就只有调用一级配置器来申请内存了, 并且用户没有设置处理例程就抛出异常
             start_free = (char *)malloc_alloc::allocate(bytes_to_get);
             // This should either throw an
             // exception or remedy the situation.  Thus we assume it
@@ -782,10 +805,10 @@ __default_alloc_template<threads, inst>::__unlock(volatile unsigned long *lock)
 #endif
 
 template <bool threads, int inst>
-char *__default_alloc_template<threads, inst>::start_free = 0;
+char *__default_alloc_template<threads, inst>::start_free = 0;  // 内存池的首地址
 
 template <bool threads, int inst>
-char *__default_alloc_template<threads, inst>::end_free = 0;
+char *__default_alloc_template<threads, inst>::end_free = 0;  // 内存池的结束地址
 
 template <bool threads, int inst>
 size_t __default_alloc_template<threads, inst>::heap_size = 0;
