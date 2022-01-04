@@ -32,16 +32,25 @@
 #define __SGI_STL_INTERNAL_ITERATOR_H
 
 __STL_BEGIN_NAMESPACE
-
+// input iterator(输入迭代器) : 迭代器所指的内容不能被修改, 只读且只能执行一次读操作.
 struct input_iterator_tag {};
+// output iterator(输出迭代器) : 只写并且一次只能执行一次写操作.
 struct output_iterator_tag {};
+// forward iterator(正向迭代器) : 支持读写操作且支持多次读写操作.
 struct forward_iterator_tag : public input_iterator_tag {};
+// bidirectional iterator(双向迭代器) : 支持双向的移动且支持多次读写操作.
 struct bidirectional_iterator_tag : public forward_iterator_tag {};
+// random access iterator(随即访问迭代器) : 支持双向移动且支持多次读写操作. p+n, p-n等.
 struct random_access_iterator_tag : public bidirectional_iterator_tag {};
 
+
+/* 每个类模板，类型虽然不一致，但是都是用了 typedef 提供统一的命名 为了traits进行类型萃取 */
 template <class T, class Distance> struct input_iterator {
+  // 迭代器类型
   typedef input_iterator_tag iterator_category;
+  // 指向对象类型
   typedef T                  value_type;
+  // Distance 类型
   typedef Distance           difference_type;
   typedef T*                 pointer;
   typedef T&                 reference;
@@ -94,13 +103,19 @@ struct iterator {
 
 #ifdef __STL_CLASS_PARTIAL_SPECIALIZATION
 
+/* iterator_traits结构  使用typename对参数类型的提取 */
+/***************************************************/
+/* iterator_traits 是一个中间层，包含了 类 和 指针 类型两种情况
+ * 自定义类 支持 class::value 的语法定义，但是普通类型不行，所以重新封装了一个 iterator_traits
+ * 使用了偏特化的 版本 处理 普通指针和普通类型的情况
+ * */
 template <class Iterator>
 struct iterator_traits {
-  typedef typename Iterator::iterator_category iterator_category;
-  typedef typename Iterator::value_type        value_type;
-  typedef typename Iterator::difference_type   difference_type;
-  typedef typename Iterator::pointer           pointer;
-  typedef typename Iterator::reference         reference;
+  typedef typename Iterator::iterator_category iterator_category; //迭代器类型
+  typedef typename Iterator::value_type        value_type;   // 迭代器所指对象的类型
+  typedef typename Iterator::difference_type   difference_type; // 两个迭代器之间的距离
+  typedef typename Iterator::pointer           pointer; // 迭代器所指对象的类型指针
+  typedef typename Iterator::reference         reference;   // 迭代器所指对象的类型引用
 };
 
 // 范围 偏特化 特化为指针类型
@@ -116,12 +131,14 @@ struct iterator_traits<T*> {
 template <class T>
 struct iterator_traits<const T*> {
   typedef random_access_iterator_tag iterator_category;
-  typedef T                          value_type;
+  typedef T                          value_type; // 注意是 T 而不是 const T
   typedef ptrdiff_t                  difference_type;
   typedef const T*                   pointer;
   typedef const T&                   reference;
 };
+/**********************************************************/
 
+// 获取 Iterator 的迭代器类型
 template <class Iterator>
 inline typename iterator_traits<Iterator>::iterator_category
 iterator_category(const Iterator&) {
@@ -238,8 +255,10 @@ inline void __distance(RandomAccessIterator first, RandomAccessIterator last,
   n += last - first;
 }
 
+/* distance是用于计算连个迭代器之间的距离, 因为重载就可以通过不同的迭代器类型选择不同的函数来提高效率. */
 template <class InputIterator, class Distance>
 inline void distance(InputIterator first, InputIterator last, Distance& n) {
+  // iterator_category 返回 first 的迭代器类型，代用对应的重载函数计算 distance
   __distance(first, last, n, iterator_category(first));
 }
 
@@ -259,7 +278,7 @@ template <class RandomAccessIterator>
 inline typename iterator_traits<RandomAccessIterator>::difference_type
 __distance(RandomAccessIterator first, RandomAccessIterator last,
            random_access_iterator_tag) {
-  return last - first;
+  return last - first; // 随机访问迭代器 是连续内存，直接差值计算
 }
 
 template <class InputIterator>
