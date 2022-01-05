@@ -28,6 +28,8 @@
  *   You should not attempt to use it directly.
  */
 
+/* list是用链表进行实现的, 而链表对删除, 插入的时间复杂度为O(1), 效率相当高, 但是随机访问的时间复杂度为O(n).  */
+
 #ifndef __SGI_STL_INTERNAL_LIST_H
 #define __SGI_STL_INTERNAL_LIST_H
 
@@ -37,11 +39,14 @@ __STL_BEGIN_NAMESPACE
 #pragma set woff 1174
 #endif
 
+// 链表节点 数据结构中就储存前后指针（双向链表）和属性
 template<class T>
 struct __list_node {
-    typedef void *void_pointer;
+    typedef void* void_pointer;
+    // 前后指针
     void_pointer next;
     void_pointer prev;
+    // 属性
     T data;
 };
 
@@ -51,6 +56,7 @@ struct __list_iterator {
     typedef __list_iterator<T, const T &, const T *> const_iterator;
     typedef __list_iterator<T, Ref, Ptr> self;
 
+    // 定义迭代器类型 bidirectional_iterator_tag ， 方便 type traits
     typedef bidirectional_iterator_tag iterator_category;
     typedef T value_type;
     typedef Ptr pointer;
@@ -61,6 +67,7 @@ struct __list_iterator {
 
     link_type node;
 
+    // 构造函数
     __list_iterator(link_type x) : node(x) {}
 
     __list_iterator() {}
@@ -131,6 +138,7 @@ protected:
     typedef __list_node<T> list_node;
     typedef simple_alloc <list_node, Alloc> list_node_allocator;
 public:
+    // 定义嵌套类型
     typedef T value_type;
     typedef value_type *pointer;
     typedef const value_type *const_pointer;
@@ -145,8 +153,8 @@ public:
     typedef __list_iterator<T, const T &, const T *> const_iterator;
 
 #ifdef __STL_CLASS_PARTIAL_SPECIALIZATION
-    typedef sgi_std::reverse_iterator<const_iterator> const_reverse_iterator;
-    typedef sgi_std::reverse_iterator<iterator> reverse_iterator;
+    typedef typename sgi_std::reverse_iterator<const_iterator> const_reverse_iterator;
+    typedef typename sgi_std::reverse_iterator<iterator> reverse_iterator;
 #else /* __STL_CLASS_PARTIAL_SPECIALIZATION */
     typedef reverse_bidirectional_iterator <const_iterator, value_type,
     const_reference, difference_type>
@@ -157,10 +165,13 @@ public:
 #endif /* __STL_CLASS_PARTIAL_SPECIALIZATION */
 
 protected:
+    // 分配一个元素大小的空间, 返回分配的地址
     link_type get_node() { return list_node_allocator::allocate(); }
 
+    // 释放一个元素大小的内存
     void put_node(link_type p) { list_node_allocator::deallocate(p); }
 
+    // 分配一个元素大小的空间并调用构造初始化内存
     link_type create_node(const T &x) {
         link_type p = get_node();
         __STL_TRY{
@@ -170,12 +181,14 @@ protected:
         return p;
     }
 
+    // 调用析构并释放一个元素大小的空间
     void destroy_node(link_type p) {
         destroy(&p->data);
         put_node(p);
     }
 
 protected:
+    // 对节点初始化
     void empty_initialize() {
         node = get_node();
         node->next = node;
@@ -223,19 +236,25 @@ protected:
 #endif /* __STL_MEMBER_TEMPLATES */
 
 protected:
-    link_type node;
+    /*因为node节点始终指向的一个空节点同时list是一个循环的链表, 空节点正好在头和尾的中间,
+     * 所以node.next就是指向头的指针, node.prev就是指向结束的指针,
+     * end返回的是最后一个数据的后一个地址也就是node
+    */
+    link_type node; // 定义一个节点, 这里是一个指针
 
 public:
+    // 默认构造函数, 分配一个空的node节点
     list() { empty_initialize(); }
 
     iterator begin() { return (link_type) ((*node).next); }
 
     const_iterator begin() const { return (link_type) ((*node).next); }
 
-    iterator end() { return node; }
+    iterator end() { return node; } // 返回最后一个元素的后一个的地址
 
     const_iterator end() const { return node; }
 
+    // 这里是为旋转做准备, rbegin返回最后一个地址, rend返回第一个地址
     reverse_iterator rbegin() { return reverse_iterator(end()); }
 
     const_reverse_iterator rbegin() const {
@@ -248,8 +267,10 @@ public:
         return const_reverse_iterator(begin());
     }
 
+    // 判断是否为空链表, 这是判断只有一个空node来表示链表为空.
     bool empty() const { return node->next == node; }
 
+    // 因为这个链表, 地址并不连续, 所以要自己迭代计算链表的长度
     size_type size() const {
         size_type result = 0;
         distance(begin(), end(), result);
@@ -258,10 +279,12 @@ public:
 
     size_type max_size() const { return size_type(-1); }
 
+    // 返回第一个元素的值
     reference front() { return *begin(); }
 
     const_reference front() const { return *begin(); }
 
+    // 返回最后一个元素的值
     reference back() { return *(--end()); }
 
     const_reference back() const { return *(--end()); }
@@ -329,12 +352,14 @@ public:
         erase(--tmp);
     }
 
+    // 都调用同一个函数进行初始化
     list(size_type n, const T &value) { fill_initialize(n, value); }
 
     list(int n, const T &value) { fill_initialize(n, value); }
 
     list(long n, const T &value) { fill_initialize(n, value); }
 
+    // 分配n个节点
     explicit list(size_type n) { fill_initialize(n, T()); }
 
 #ifdef __STL_MEMBER_TEMPLATES
@@ -344,7 +369,7 @@ public:
     }
 
 #else /* __STL_MEMBER_TEMPLATES */
-
+    // 接受两个迭代器进行范围的初始化
     list(const T *first, const T *last) { range_initialize(first, last); }
 
     list(const_iterator first, const_iterator last) {
@@ -352,13 +377,15 @@ public:
     }
 
 #endif /* __STL_MEMBER_TEMPLATES */
-
+    // 接受一个list参数, 进行拷贝
     list(const list<T, Alloc> &x) {
         range_initialize(x.begin(), x.end());
     }
 
     ~list() {
+        // 删除初空节点以外的所有节点
         clear();
+        // 删除空节点
         put_node(node);
     }
 
