@@ -324,10 +324,13 @@ public:
         insert(pos, (size_type) n, x);
     }
 
+    // 头部插入节点
     void push_front(const T &x) { insert(begin(), x); }
 
+    // 尾部插入节点
     void push_back(const T &x) { insert(end(), x); }
 
+    /* 删除元素的操作大都是由erase函数来实现的, 其他的所有函数都是直接或间接调用erase */
     iterator erase(iterator position) {
         link_type next_node = link_type(position.node->next);
         link_type prev_node = link_type(position.node->prev);
@@ -339,14 +342,18 @@ public:
 
     iterator erase(iterator first, iterator last);
 
+    // resize重新修改list的大小
     void resize(size_type new_size, const T &x);
 
     void resize(size_type new_size) { resize(new_size, T()); }
 
+    // 删除除空节点以外的所有节点, 即只留下了最初创建的空节点.
     void clear();
 
+    // 头部删除节点
     void pop_front() { erase(begin()); }
 
+    // 尾部删除节点
     void pop_back() {
         iterator tmp = end();
         erase(--tmp);
@@ -389,6 +396,7 @@ public:
         put_node(node);
     }
 
+    // 重载赋值操作
     list<T, Alloc> &operator=(const list<T, Alloc> &x);
 
 protected:
@@ -422,8 +430,11 @@ public:
             transfer(position, first, last);
     }
 
+    // remove 指定 value 的节点 调用erase链表清除
     void remove(const T &value);
 
+    // unique函数是将数值相同且连续的元素删除, 只保留一个副本
+    // 并不是删除所有的相同元素, 而是连续的相同元素,
     void unique();
 
     void merge(list &x);
@@ -445,6 +456,7 @@ public:
     __STL_NULL_TMPL_ARGS(const list &x, const list &y);
 };
 
+// 重载的 == 运算符
 template<class T, class Alloc>
 inline bool operator==(const list<T, Alloc> &x, const list<T, Alloc> &y) {
     typedef typename list<T, Alloc>::link_type link_type;
@@ -459,6 +471,7 @@ inline bool operator==(const list<T, Alloc> &x, const list<T, Alloc> &y) {
     return n1 == e1 && n2 == e2;
 }
 
+// 重载的 < 运算符
 template<class T, class Alloc>
 inline bool operator<(const list<T, Alloc> &x, const list<T, Alloc> &y) {
     return lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());
@@ -505,20 +518,24 @@ void list<T, Alloc>::insert(iterator position, size_type n, const T &x) {
         insert(position, x);
 }
 
+/* erase的重载, 删除两个迭代器之间的元素 */
 template<class T, class Alloc>
 typename list<T, Alloc>::iterator list<T, Alloc>::erase(iterator first, iterator last) {
-    while (first != last) erase(first++);
+    while (first != last)
+        erase(first++);
     return last;
 }
 
 template<class T, class Alloc>
 void list<T, Alloc>::resize(size_type new_size, const T &x) {
     iterator i = begin();
-    size_type len = 0;
+    size_type len = 0; // 记录当前链表长度
     for (; i != end() && len < new_size; ++i, ++len);
     if (len == new_size)
+        // 如果链表长度大于new_size的大小, 那就删除后面多余的节点
         erase(i, end());
     else                          // i == end()
+        // i == end(), 扩大链表的节点
         insert(end(), new_size - len, x);
 }
 
@@ -537,14 +554,19 @@ void list<T, Alloc>::clear() {
 template<class T, class Alloc>
 list<T, Alloc> &list<T, Alloc>::operator=(const list<T, Alloc> &x) {
     if (this != &x) {
+        // first1 指向原链表  first2 指向复制的链表
         iterator first1 = begin();
         iterator last1 = end();
         const_iterator first2 = x.begin();
         const_iterator last2 = x.end();
-        while (first1 != last1 && first2 != last2) *first1++ = *first2++;
+        // 直到两个链表有一个空间用尽
+        while (first1 != last1 && first2 != last2)
+            *first1++ = *first2++;
+        // 原链表大, 复制完后要删除掉原链表多余的元素
         if (first2 == last2)
             erase(first1, last1);
         else
+            // 原链表小, 复制完后要还要将x链表的剩余元素以插入的方式插入到原链表中
             insert(last1, first2, last2);
     }
     return *this;
@@ -557,7 +579,9 @@ void list<T, Alloc>::remove(const T &value) {
     while (first != last) {
         iterator next = first;
         ++next;
-        if (*first == value) erase(first);
+        // 删除相等的节点
+        if (*first == value)
+            erase(first);
         first = next;
     }
 }
