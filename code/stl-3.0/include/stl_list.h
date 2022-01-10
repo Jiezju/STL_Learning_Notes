@@ -291,7 +291,9 @@ public:
 
     void swap(list<T, Alloc> &x) { __STD::swap(node, x.node); }
 
+    //  每一个重载函数都是直接或间接的调用该函数.
     iterator insert(iterator position, const T &x) {
+        // 双向链表插入
         link_type tmp = create_node(x);
         tmp->next = position.node;
         tmp->prev = position.node->prev;
@@ -307,6 +309,7 @@ public:
     void insert(iterator position, InputIterator first, InputIterator last);
 #else /* __STL_MEMBER_TEMPLATES */
 
+    // 在指定位置上 插入 一段链表
     void insert(iterator position, const T *first, const T *last);
 
     void insert(iterator position,
@@ -314,6 +317,7 @@ public:
 
 #endif /* __STL_MEMBER_TEMPLATES */
 
+    // 在指定位置上 插入 n 个节点
     void insert(iterator pos, size_type n, const T &x);
 
     void insert(iterator pos, int n, const T &x) {
@@ -400,19 +404,29 @@ public:
     list<T, Alloc> &operator=(const list<T, Alloc> &x);
 
 protected:
+    // transfer函数功能是将链表中 [first, last) 内的所有元素移动到 position 之前
+    // 第一个迭代器表示链表要插入的位置, first到last最闭右开区间插入到position之前.
     void transfer(iterator position, iterator first, iterator last) {
         if (position != last) {
+            // last的前一个节点 的next指向插入的position节点
             (*(link_type((*last.node).prev))).next = position.node;
+            // first的前一个节点 next 指向last
             (*(link_type((*first.node).prev))).next = last.node;
+            // position的前一个节点的next指向first节点
             (*(link_type((*position.node).prev))).next = first.node;
+            // 临时变量tmp保存position的前一个节点
             link_type tmp = link_type((*position.node).prev);
+            // position的前一个节点指向last的前一个节点
             (*position.node).prev = (*last.node).prev;
+            // last的前一个节点 指向first的前一个节点
             (*last.node).prev = (*first.node).prev;
+            // first的prev指向tmp
             (*first.node).prev = tmp;
         }
     }
 
 public:
+    // 将两个链表进行合并.
     void splice(iterator position, list &x) {
         if (!x.empty())
             transfer(position, x.begin(), x.end());
