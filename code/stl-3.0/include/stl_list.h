@@ -426,12 +426,13 @@ protected:
     }
 
 public:
-    // 将两个链表进行合并.
+    // 将两个链表进行合并. 将链表 x 插入 position 位置
     void splice(iterator position, list &x) {
         if (!x.empty())
             transfer(position, x.begin(), x.end());
     }
 
+    // 将 i 所指向的 元素 插入 到 position 之前
     void splice(iterator position, list &, iterator i) {
         iterator j = i;
         ++j;
@@ -439,6 +440,7 @@ public:
         transfer(position, i, j);
     }
 
+    // 将 [first, last) 内的所有元素 插入 到 position 之前
     void splice(iterator position, list &, iterator first, iterator last) {
         if (first != last)
             transfer(position, first, last);
@@ -451,8 +453,10 @@ public:
     // 并不是删除所有的相同元素, 而是连续的相同元素,
     void unique();
 
+    // 合并两个 list ， 两个 list 必须要 递增排序
     void merge(list &x);
 
+    // 实现将链表翻转的功能
     void reverse();
 
     // 数据 list 与操作 sort 进行绑定，list 有自己独特的 sort 方法
@@ -624,28 +628,37 @@ void list<T, Alloc>::merge(list<T, Alloc> &x) {
     while (first1 != last1 && first2 != last2)
         if (*first2 < *first1) {
             iterator next = first2;
+            // 将 [first2, first2+1) 插入到first1的前面
             transfer(first1, first2, ++next);
             first2 = next;
         } else
             ++first1;
+    // 如果链表x还有元素则全部插入到first1链表的尾部
     if (first2 != last2) transfer(last1, first2, last2);
 }
 
+// 原理：将 begin() 之后的 元素 插入 到 begin() 之前，同时更新 begin 到插入的元素
 template<class T, class Alloc>
 void list<T, Alloc>::reverse() {
-    if (node->next == node || link_type(node->next)->next == node) return;
+    // 空链表 或者 单个元素 的 链表 不进行 reverse
+    if (node->next == node || link_type(node->next)->next == node)
+        return;
     iterator first = begin();
     ++first;
     while (first != end()) {
         iterator old = first;
         ++first;
+        // 将 [old, old+1) 插入 到 begin() 之前
         transfer(begin(), old, first);
     }
 }
 
 template<class T, class Alloc>
 void list<T, Alloc>::sort() {
-    if (node->next == node || link_type(node->next)->next == node) return;
+    // 空链表 或者 单个元素 的 链表 不进行排序
+    if (node->next == node || link_type(node->next)->next == node)
+        return;
+    // 中转站
     list<T, Alloc> carry;
     list<T, Alloc> counter[64];
     int fill = 0;
