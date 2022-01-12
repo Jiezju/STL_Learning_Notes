@@ -653,6 +653,17 @@ void list<T, Alloc>::reverse() {
     }
 }
 
+//  归并排序
+/* 算法步骤 */
+// sort用了一个数组链表用来存储2^i个元素, 当上一个元素存储满了之后继续往下一个链表存储, 最后将所有的链表进行merge归并(合并)
+/* 1. 每次读一个数据到carry中，并将carry的数据转移到counter[0]中
+       当counter[0]中的数据个数少于2时，持续转移数据到counter[0]中
+       当counter[0]的数据个数等于2时，将counter[0]中的数据转移到counter[1]
+       ...
+       从counter[i]转移到counter[i+1],直到counter[fill]中数据个数达到2^(fill+1)个。
+   2. ++fill, 重复步骤 1
+ *
+ * */
 template<class T, class Alloc>
 void list<T, Alloc>::sort() {
     // 空链表 或者 单个元素 的 链表 不进行排序
@@ -663,17 +674,20 @@ void list<T, Alloc>::sort() {
     list<T, Alloc> counter[64];
     int fill = 0;
     while (!empty()) {
+        //每次取出一个元素到 carry 中
         carry.splice(carry.begin(), *this, begin());
         int i = 0;
         while (i < fill && !counter[i].empty()) {
-            counter[i].merge(carry);
-            carry.swap(counter[i++]);
+            counter[i].merge(carry); //将carry中的元素合并到counter[i]中
+            carry.swap(counter[i++]); //交换之后counter[i-1]为空， i++
         }
         carry.swap(counter[i]);
         if (i == fill) ++fill;
     }
 
-    for (int i = 1; i < fill; ++i) counter[i].merge(counter[i - 1]);
+    // 将counter数组链表的所有节点按从小到大的顺序排列存储在counter[fill-1]的链表中
+    for (int i = 1; i < fill; ++i)
+        counter[i].merge(counter[i - 1]);
     swap(counter[fill - 1]);
 }
 
