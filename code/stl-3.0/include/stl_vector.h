@@ -40,9 +40,11 @@ __STL_BEGIN_NAMESPACE
 template <class T, class Alloc = alloc>
 class vector {
 public:
+    // 定义vector自身的嵌套型别
   typedef T value_type;
   typedef value_type* pointer;
   typedef const value_type* const_pointer;
+    // 定义迭代器, 这里就只是一个普通的指针
   typedef value_type* iterator;
   typedef const value_type* const_iterator;
   typedef value_type& reference;
@@ -61,15 +63,21 @@ public:
 #endif /* __STL_CLASS_PARTIAL_SPECIALIZATION */
 protected:
   typedef simple_alloc<value_type, Alloc> data_allocator;
-  iterator start;
-  iterator finish;
-  iterator end_of_storage;
+
+  /*
+   * 表示用户的数据的起始地址, 结束地址, 还需要其真正的最大地址,
+   * 所以总共需要3个迭代器分别指向数据的头(start), 数据的尾(finish), 数组的尾(end_of_storage).
+   * */
+  iterator start; // 使用空间的头
+  iterator finish; // 使用空间的尾
+  iterator end_of_storage;   // 可用空间的尾
   void insert_aux(iterator position, const T& x);
   void deallocate() {
     if (start) data_allocator::deallocate(start, end_of_storage - start);
   }
 
   void fill_initialize(size_type n, const T& value) {
+      // 初始化并初始化值
     start = allocate_and_fill(n, value);
     finish = start + n;
     end_of_storage = finish;
@@ -100,6 +108,7 @@ public:
   vector(long n, const T& value) { fill_initialize(n, value); }
   explicit vector(size_type n) { fill_initialize(n, T()); }
 
+    // 接受一个vector参数的构造函数
   vector(const vector<T, Alloc>& x) {
     start = allocate_and_copy(x.end() - x.begin(), x.begin(), x.end());
     finish = start + (x.end() - x.begin());
@@ -211,6 +220,7 @@ public:
 
 protected:
   iterator allocate_and_fill(size_type n, const T& x) {
+      // 申请n个元素的线性空间.
     iterator result = data_allocator::allocate(n);
     __STL_TRY {
       uninitialized_fill_n(result, n, x);
