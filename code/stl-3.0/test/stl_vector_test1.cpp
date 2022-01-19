@@ -18,6 +18,10 @@ int main()
     v1.push_back(3);
     v1.push_back(4);
 
+    // 这里清除的是一个[v1.begin()+2, v1.end()-1) , 左闭右开的区间
+    v1.erase(v1.begin()+2, v1.end()-1);
+    v1.pop_back();
+
     if(!v1.empty())    // 不为空
     {
         std::cout << *v1.begin() << " " << v1.front() << " " << *(v1.end() - 1) << " " << v1.back() <<  std::endl;
@@ -25,5 +29,5 @@ int main()
         v1.~vector();
     }
 
-    exit(0);
+    return 0;
 }

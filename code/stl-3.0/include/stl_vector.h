@@ -99,6 +99,8 @@ public:
   size_type max_size() const { return size_type(-1) / sizeof(T); }
   size_type capacity() const { return size_type(end_of_storage - begin()); }
   bool empty() const { return begin() == end(); }
+
+  // n可以为负数?
   reference operator[](size_type n) { return *(begin() + n); }
   const_reference operator[](size_type n) const { return *(begin() + n); }
 
@@ -134,8 +136,13 @@ public:
     destroy(start, finish);
     deallocate();
   }
+
+  // = 赋值运算
   vector<T, Alloc>& operator=(const vector<T, Alloc>& x);
+
+  // 扩大vector 容量
   void reserve(size_type n) {
+      // 修改的容器大小[容量]要大于原始数组大小才行
     if (capacity() < n) {
       const size_type old_size = size();
       iterator tmp = allocate_and_copy(n, start, finish);
@@ -150,14 +157,20 @@ public:
   const_reference front() const { return *begin(); }
   reference back() { return *(end() - 1); }
   const_reference back() const { return *(end() - 1); }
+
+  // vector的push和pop操作都只是对尾进行操作
   void push_back(const T& x) {
+    // 如果还没有到填满整个数组, 就在数据尾部插入
     if (finish != end_of_storage) {
       construct(finish, x);
       ++finish;
     }
     else
+      // 数组被填充满, 调用insert_aux必须重新寻找新的更大的连续空间, 再进行插入
       insert_aux(end(), x);
   }
+
+  // 只是将3个迭代器进行交换
   void swap(vector<T, Alloc>& x) {
     __STD::swap(start, x.start);
     __STD::swap(finish, x.finish);
@@ -196,19 +209,26 @@ public:
     --finish;
     destroy(finish);
   }
+
+  // 清除指定位置的元素
   iterator erase(iterator position) {
     if (position + 1 != end())
+      // 将删除元素后面所有元素往前移动
       copy(position + 1, finish, position);
     --finish;
     destroy(finish);
     return position;
   }
+
+  // 用于清除一个范围内的所有元素
   iterator erase(iterator first, iterator last) {
     iterator i = copy(last, finish, first);
     destroy(i, finish);
     finish = finish - (last - first);
     return first;
   }
+
+  // 重新修改 数组的 size
   void resize(size_type new_size, const T& x) {
     if (new_size < size()) 
       erase(begin() + new_size, end());
@@ -216,6 +236,8 @@ public:
       insert(end(), new_size - size(), x);
   }
   void resize(size_type new_size) { resize(new_size, T()); }
+
+  // 调用 rease 删除 所有元素
   void clear() { erase(begin(), end()); }
 
 protected:
@@ -309,15 +331,19 @@ template <class T, class Alloc>
 vector<T, Alloc>& vector<T, Alloc>::operator=(const vector<T, Alloc>& x) {
   if (&x != this) {
     if (x.size() > capacity()) {
+      // 进行范围的复制, 并销毁掉原始的数据.
       iterator tmp = allocate_and_copy(x.end() - x.begin(),
                                        x.begin(), x.end());
       destroy(start, finish);
       deallocate();
+        // 修改迭代指针
       start = tmp;
       end_of_storage = start + (x.end() - x.begin());
     }
     else if (size() >= x.size()) {
+      // 直接将赋值的数据内容拷贝到新数组中
       iterator i = copy(x.begin(), x.end(), begin());
+      // 并将后面的元素析构掉
       destroy(i, finish);
     }
     else {
